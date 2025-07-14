@@ -116,7 +116,7 @@ export KUBECONFIG=admin.conf
 kubectl config set-cluster dumberk8s \
   --certificate-authority=certs/ca.pem \
   --embed-certs=true \
-  --server=https://127.0.0.1:8080
+  --server=https://127.0.0.1:4040
 
 kubectl config set-credentials admin \
   --embed-certs=true \
@@ -156,7 +156,7 @@ ETCD_OPTS="--etcd-cafile=certs/ca.pem \
 bin/kube-apiserver ${CERTS_OPTS} ${ETCD_OPTS} \
             --allow-privileged \
 	        --authorization-mode=Node,RBAC \
-            --secure-port 8080 &
+            --secure-port 4040 &
 
             #!/bin/bash
 CERTS_OPTS="--cluster-signing-cert-file=certs/ca.pem \

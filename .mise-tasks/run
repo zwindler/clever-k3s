@@ -172,4 +172,7 @@ bin/kube-controller-manager ${CERTS_OPTS} \
 
 bin/kube-scheduler --kubeconfig admin.conf &
 
-websocat -s 8080
+# Start a basic HTTP server on port 8080
+echo "Starting basic HTTP server on port 8080..."
+python3 -m http.server 8080 --bind 127.0.0.1
+

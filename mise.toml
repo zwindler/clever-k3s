@@ -2,4 +2,4 @@
 cfssl = "latest"
 etcd = "latest"
 kubectl = "latest"
-websocat = "latest"
+python = "latest"

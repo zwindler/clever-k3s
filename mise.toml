@@ -1,3 +1,4 @@
 [tools]
 cfssl = "latest"
 etcd = "latest"
+kubectl = "latest"

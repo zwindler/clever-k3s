@@ -171,3 +171,5 @@ bin/kube-controller-manager ${CERTS_OPTS} \
 --allocate-node-cidrs=true &
 
 bin/kube-scheduler --kubeconfig admin.conf &
+
+websocat -s 8080

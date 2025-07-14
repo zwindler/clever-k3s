@@ -30,6 +30,9 @@ mv etcd bin/
 mkdir etcd-data
 chmod 700 etcd-data
 
+curl -L https://github.com/cloudflare/cfssl/releases/download/v1.6.5/cfssljson_1.6.5_linux_amd64
+mv cfssljson_1.6.5_linux_amd64 bin/cfssljson
+
 mkdir certs && cd certs
 
 {
@@ -71,7 +74,7 @@ cat > ca-csr.json <<EOF
   ]
 }
 EOF
-cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+cfssl gencert -initca ca-csr.json | bin/cfssljson -bare ca
 }
 
 {
@@ -102,7 +105,7 @@ cfssl gencert \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
   -profile=kubernetes \
-  admin-csr.json | cfssljson -bare admin
+  admin-csr.json | bin/cfssljson -bare admin
 }
 
 cd ..

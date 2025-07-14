@@ -1,2 +1,3 @@
 [tools]
-k3s = "latest"
+cfssl = "latest"
+etcd = "latest"

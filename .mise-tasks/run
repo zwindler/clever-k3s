@@ -1,5 +1,154 @@
 #! /bin/bash
 
-sysctl net.ipv4.ip_forward=1
+K8S_VERSION=1.33.0
+ETCD_VERSION=3.5.18
 
-k3s server --rootless --https-listen-port 8080
+mkdir -p bin/
+
+# YOLO
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+curl -L https://dl.k8s.io/v$K8S_VERSION/kubernetes-server-linux-$ARCH.tar.gz -o kubernetes-server-linux-$ARCH.tar.gz
+tar -zxf kubernetes-server-linux-${ARCH}.tar.gz
+for BINARY in kubectl kube-apiserver kube-scheduler kube-controller-manager kubelet kube-proxy;
+do
+  mv kubernetes/server/bin/${BINARY} .
+done
+rm kubernetes-server-linux-${ARCH}.tar.gz
+rm -rf kubernetes
+
+sudo mv kubectl /usr/local/bin
+# add kubectl autocomplete
+echo 'source <(kubectl completion bash)' >>~/.bashrc
+
+mv kube* bin/
+
+curl -L https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-${ARCH}.tar.gz | 
+  tar --strip-components=1 --wildcards -zx '*/etcd'
+mv etcd bin/
+
+mkdir etcd-data
+chmod 700 etcd-data
+
+mkdir certs && cd certs
+
+{
+cat > ca-config.json <<EOF
+{
+  "signing": {
+    "default": {
+      "expiry": "8760h"
+    },
+    "profiles": {
+      "kubernetes": {
+        "usages": ["signing", "key encipherment", "server auth", "client auth"],
+        "expiry": "8760h"
+      }
+    }
+  }
+}
+EOF
+
+cat > ca-csr.json <<EOF
+{
+  "CN": "Kubernetes",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "FR",
+      "L": "Pessac",
+      "O": "Kubernetes",
+      "OU": "CA",
+      "ST": "Nouvelle Aquitaine"
+    }
+  ],
+  "hosts": [
+    "127.0.0.1",
+    "localhost"
+  ]
+}
+EOF
+cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+}
+
+{
+cat > admin-csr.json <<EOF
+{
+  "CN": "admin",
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "FR",
+      "L": "Pessac",
+      "O": "system:masters",
+      "OU": "Démystifions Kubernetes",
+      "ST": "Nouvelle Aquitaine"
+    }
+  ],
+  "hosts": [
+    "127.0.0.1",
+    "localhost"
+  ]
+}
+EOF
+cfssl gencert \
+  -ca=ca.pem \
+  -ca-key=ca-key.pem \
+  -config=ca-config.json \
+  -profile=kubernetes \
+  admin-csr.json | cfssljson -bare admin
+}
+
+cd ..
+
+export KUBECONFIG=admin.conf
+kubectl config set-cluster demystifions-kubernetes \
+  --certificate-authority=certs/ca.pem \
+  --embed-certs=true \
+  --server=https://127.0.0.1:6443
+
+kubectl config set-credentials admin \
+  --embed-certs=true \
+  --client-certificate=certs/admin.pem \
+  --client-key=certs/admin-key.pem
+
+kubectl config set-context admin \
+  --cluster=demystifions-kubernetes \
+  --user=admin
+
+kubectl config use-context admin
+
+mkdir -p ~/.kube && cp admin.conf ~/.kube/config
+
+CERTS_OPTS="--client-cert-auth \
+           --cert-file=certs/admin.pem \
+           --key-file=certs/admin-key.pem \
+           --trusted-ca-file=certs/ca.pem"
+
+FORCE_HTTPS_OPTS="--advertise-client-urls https://127.0.0.1:2379 \
+                  --listen-client-urls https://127.0.0.1:2379"
+
+bin/etcd --data-dir etcd-data $CERTS_OPTS $FORCE_HTTPS_OPTS 
+
+CERTS_OPTS="--client-ca-file=certs/ca.pem \
+            --tls-cert-file=certs/admin.pem \
+            --tls-private-key-file=certs/admin-key.pem \
+            --service-account-key-file=certs/admin.pem \
+            --service-account-signing-key-file=certs/admin-key.pem \
+            --service-account-issuer=https://kubernetes.default.svc.cluster.local"
+
+ETCD_OPTS="--etcd-cafile=certs/ca.pem \
+           --etcd-certfile=certs/admin.pem \
+           --etcd-keyfile=certs/admin-key.pem \
+           --etcd-servers=https://127.0.0.1:2379"
+
+bin/kube-apiserver ${CERTS_OPTS} ${ETCD_OPTS} \
+            --allow-privileged \
+	        --authorization-mode=Node,RBAC \
+            --secure-port 8080

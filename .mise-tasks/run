@@ -2,6 +2,7 @@
 
 K8S_VERSION=1.33.0
 ETCD_VERSION=3.5.18
+ARCH=amd64
 
 mkdir -p bin/
 

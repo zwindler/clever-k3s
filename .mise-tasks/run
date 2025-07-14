@@ -1,6 +1,6 @@
 #! /bin/bash
 
-K8S_VERSION=1.33.0
+K8S_VERSION=1.33.2
 ETCD_VERSION=3.5.18
 ARCH=amd64
 
@@ -114,7 +114,7 @@ export KUBECONFIG=admin.conf
 kubectl config set-cluster demystifions-kubernetes \
   --certificate-authority=certs/ca.pem \
   --embed-certs=true \
-  --server=https://127.0.0.1:6443
+  --server=https://127.0.0.1:8080
 
 kubectl config set-credentials admin \
   --embed-certs=true \
@@ -154,4 +154,18 @@ ETCD_OPTS="--etcd-cafile=certs/ca.pem \
 bin/kube-apiserver ${CERTS_OPTS} ${ETCD_OPTS} \
             --allow-privileged \
 	        --authorization-mode=Node,RBAC \
-            --secure-port 8080
+            --secure-port 8080 &
+
+            #!/bin/bash
+CERTS_OPTS="--cluster-signing-cert-file=certs/ca.pem \
+            --cluster-signing-key-file=certs/ca-key.pem \
+            --service-account-private-key-file=certs/admin-key.pem \
+            --root-ca-file=certs/ca.pem"
+
+bin/kube-controller-manager ${CERTS_OPTS} \
+--kubeconfig admin.conf \
+--use-service-account-credentials \
+--cluster-cidr=10.0.0.0/16 \
+--allocate-node-cidrs=true &
+
+bin/kube-scheduler --kubeconfig admin.conf &

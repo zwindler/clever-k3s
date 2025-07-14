@@ -105,6 +105,8 @@ cfssl gencert \
 
 cd ..
 
+ls certs/
+
 ls bin/
 
 export KUBECONFIG=admin.conf

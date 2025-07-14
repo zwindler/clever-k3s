@@ -1,5 +1,5 @@
 #! /bin/bash
 
-echo 1 > /proc/sys/net/ipv4/ip_forward
+sysctl net.ipv4.ip_forward=1
 
 k3s server --rootless --https-listen-port 8080

@@ -25,6 +25,7 @@ chmod 700 etcd-data
 
 curl -L https://github.com/cloudflare/cfssl/releases/download/v1.6.5/cfssljson_1.6.5_linux_amd64 -o cfssljson_1.6.5_linux_amd64
 mv cfssljson_1.6.5_linux_amd64 bin/cfssljson
+chmod +x bin/cfssljson
 
 ls bin/
 

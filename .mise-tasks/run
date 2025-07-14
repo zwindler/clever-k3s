@@ -23,10 +23,6 @@ echo 'source <(kubectl completion bash)' >>~/.bashrc
 
 mv kube* bin/
 
-curl -L https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-${ARCH}.tar.gz | 
-  tar --strip-components=1 --wildcards -zx '*/etcd'
-mv etcd bin/
-
 mkdir etcd-data
 chmod 700 etcd-data
 

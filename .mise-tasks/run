@@ -1,2 +1,2 @@
 #! /bin/bash
-k3s server --https-listen-port 8080
+k3s server --rootless --https-listen-port 8080

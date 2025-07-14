@@ -1,6 +1,5 @@
 #! /bin/bash
 
-# Enable IP forwarding for k3s networking
-echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward > /dev/null
+echo 1 > /proc/sys/net/ipv4/ip_forward
 
 k3s server --rootless --https-listen-port 8080

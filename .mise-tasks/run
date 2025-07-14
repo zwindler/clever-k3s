@@ -69,7 +69,7 @@ cat > ca-csr.json <<EOF
   ]
 }
 EOF
-cfssl gencert -initca ca-csr.json | bin/cfssljson -bare ca
+cfssl gencert -initca ca-csr.json | ../bin/cfssljson -bare ca
 }
 
 {
@@ -100,10 +100,12 @@ cfssl gencert \
   -ca-key=ca-key.pem \
   -config=ca-config.json \
   -profile=kubernetes \
-  admin-csr.json | bin/cfssljson -bare admin
+  admin-csr.json | ../bin/cfssljson -bare admin
 }
 
 cd ..
+
+ls bin/
 
 export KUBECONFIG=admin.conf
 kubectl config set-cluster demystifions-kubernetes \
@@ -132,7 +134,7 @@ CERTS_OPTS="--client-cert-auth \
 FORCE_HTTPS_OPTS="--advertise-client-urls https://127.0.0.1:2379 \
                   --listen-client-urls https://127.0.0.1:2379"
 
-etcd --data-dir etcd-data $CERTS_OPTS $FORCE_HTTPS_OPTS 
+etcd --data-dir etcd-data $CERTS_OPTS $FORCE_HTTPS_OPTS &
 
 CERTS_OPTS="--client-ca-file=certs/ca.pem \
             --tls-cert-file=certs/admin.pem \

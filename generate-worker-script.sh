@@ -232,9 +232,17 @@ fi
 
 # Replace CA certificate in the script
 if [[ -f "certs/ca.pem" ]]; then
-    CA_CONTENT=$(cat certs/ca.pem)
-    # Use a more complex sed command to handle multiline replacement
-    sed -i "/REPLACE_WITH_CA_CERTIFICATE/c\\${CA_CONTENT}" setup-worker-node.sh
+    echo "Embedding CA certificate in worker script..."
+    # Use a temporary file to handle multiline replacement safely
+    temp_script=$(mktemp)
+    while IFS= read -r line; do
+        if [[ "$line" == "REPLACE_WITH_CA_CERTIFICATE" ]]; then
+            cat certs/ca.pem
+        else
+            echo "$line"
+        fi
+    done < setup-worker-node.sh > "$temp_script"
+    mv "$temp_script" setup-worker-node.sh
 fi
 
 echo "✓ Worker setup script generated: setup-worker-node.sh"

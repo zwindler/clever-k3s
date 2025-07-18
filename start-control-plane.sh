@@ -9,6 +9,7 @@ echo "=== Starting Kubernetes control plane ==="
 API_CERTS_OPTS="--client-ca-file=certs/ca.pem \
             --tls-cert-file=certs/admin.pem \
             --tls-private-key-file=certs/admin-key.pem \
+            --enable-bootstrap-token-auth \
             --service-account-key-file=certs/admin.pem \
             --service-account-signing-key-file=certs/admin-key.pem \
             --service-account-issuer=https://kubernetes.default.svc.cluster.local"

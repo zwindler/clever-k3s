@@ -197,6 +197,10 @@ Check logs with:
 
 ```
 
+Note : if you are interested on bootstrap tokens, take a look here
+
+* https://kubernetes.io/docs/reference/access-authn-authz/bootstrap-tokens/
+
 ## Future work
 
 If I continue to find this project funny, I might add missing binaries to mise by creating aqua or ubi packages for `cfssljson` and `kube-.*`, eliminating the need to curl the binaries myself in `setup-binaries.sh`.

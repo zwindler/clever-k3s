@@ -13,7 +13,7 @@ fi
 
 # Generate a random token
 TOKEN_ID=$(head -c 3 /dev/urandom | xxd -p)
-TOKEN_SECRET=$(head -c 16 /dev/urandom | xxd -p)
+TOKEN_SECRET=$(head -c 8 /dev/urandom | xxd -p)
 TOKEN="${TOKEN_ID}.${TOKEN_SECRET}"
 
 echo "Creating bootstrap token..."

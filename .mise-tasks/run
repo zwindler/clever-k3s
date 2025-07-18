@@ -1,178 +1,86 @@
-#! /bin/bash
+#!/bin/bash
 
-K8S_VERSION=1.33.2
-ETCD_VERSION=3.5.18
-ARCH=amd64
+# Main script to setup and run Kubernetes cluster
+set -e
 
-mkdir -p bin/
+# Export environment variables
+export K8S_VERSION=1.33.2
+export ETCD_VERSION=3.5.18
+export ARCH=amd64
 
-curl -L https://dl.k8s.io/v$K8S_VERSION/kubernetes-server-linux-$ARCH.tar.gz -o kubernetes-server-linux-$ARCH.tar.gz
-tar -zxf kubernetes-server-linux-${ARCH}.tar.gz
-for BINARY in kubectl kube-apiserver kube-scheduler kube-controller-manager kubelet kube-proxy;
-do
-  mv kubernetes/server/bin/${BINARY} .
-done
-rm kubernetes-server-linux-${ARCH}.tar.gz
-rm -rf kubernetes
+echo "🚀 Starting Kubernetes cluster setup..."
+echo "Kubernetes version: $K8S_VERSION"
+echo ""
 
-# add kubectl autocomplete
-echo 'source <(kubectl completion bash)' >>~/.bashrc
+# Step 1: Setup binaries and tools
+echo "📦 Step 1: Setting up binaries..."
+./setup-binaries.sh
 
-mv kube* bin/
+echo ""
 
-mkdir etcd-data
-chmod 700 etcd-data
+# Step 2: Generate certificates
+echo "🔐 Step 2: Generating certificates..."
+./generate-certs.sh
 
-curl -L https://github.com/cloudflare/cfssl/releases/download/v1.6.5/cfssljson_1.6.5_linux_amd64 -o cfssljson_1.6.5_linux_amd64
-mv cfssljson_1.6.5_linux_amd64 bin/cfssljson
-chmod +x bin/cfssljson
+echo ""
 
-ls bin/
+# Step 3: Setup kubeconfig
+echo "⚙️  Step 3: Setting up kubeconfig..."
+./setup-kubeconfig.sh
 
-mkdir certs && cd certs
+echo ""
 
-{
-cat > ca-config.json <<EOF
-{
-  "signing": {
-    "default": {
-      "expiry": "8760h"
-    },
-    "profiles": {
-      "kubernetes": {
-        "usages": ["signing", "key encipherment", "server auth", "client auth"],
-        "expiry": "8760h"
-      }
-    }
-  }
-}
-EOF
+# Step 4: Start etcd
+echo "💾 Step 4: Starting etcd..."
+./start-etcd.sh
 
-cat > ca-csr.json <<EOF
-{
-  "CN": "Kubernetes",
-  "key": {
-    "algo": "rsa",
-    "size": 2048
-  },
-  "names": [
-    {
-      "C": "FR",
-      "L": "Pessac",
-      "O": "Kubernetes",
-      "OU": "CA",
-      "ST": "Nouvelle Aquitaine"
-    }
-  ],
-  "hosts": [
-    "127.0.0.1",
-    "localhost",
-    "dumberk8s.zwindler.fr"
-  ]
-}
-EOF
-cfssl gencert -initca ca-csr.json | ../bin/cfssljson -bare ca
-}
+echo ""
 
-{
-cat > admin-csr.json <<EOF
-{
-  "CN": "admin",
-  "key": {
-    "algo": "rsa",
-    "size": 2048
-  },
-  "names": [
-    {
-      "C": "FR",
-      "L": "Pessac",
-      "O": "system:masters",
-      "OU": "dumber k8s",
-      "ST": "Nouvelle Aquitaine"
-    }
-  ],
-  "hosts": [
-    "127.0.0.1",
-    "localhost",
-    "dumberk8s.zwindler.fr"
-  ]
-}
-EOF
-cfssl gencert \
-  -ca=ca.pem \
-  -ca-key=ca-key.pem \
-  -config=ca-config.json \
-  -profile=kubernetes \
-  admin-csr.json | ../bin/cfssljson -bare admin
-}
+# Step 5: Start control plane
+echo "🎛️  Step 5: Starting control plane..."
+./start-control-plane.sh
 
-cd ..
+echo ""
 
-ls certs/
+# Step 6: Setup RBAC for worker nodes
+echo "🔒 Step 6: Setting up RBAC for worker nodes..."
+./setup-node-rbac.sh
 
-ls bin/
+echo ""
 
-export KUBECONFIG=admin.conf
-kubectl config set-cluster dumberk8s \
-  --certificate-authority=certs/ca.pem \
-  --embed-certs=true \
-  --server=https://127.0.0.1:4040
+# Step 7: Generate bootstrap token
+echo "🔑 Step 7: Generating bootstrap token..."
+./generate-bootstrap-token.sh
 
-kubectl config set-credentials admin \
-  --embed-certs=true \
-  --client-certificate=certs/admin.pem \
-  --client-key=certs/admin-key.pem
+echo ""
 
-kubectl config set-context admin \
-  --cluster=dumberk8s \
-  --user=admin
+# Step 8: Generate worker setup script
+echo "📝 Step 8: Generating worker setup script..."
+./generate-worker-script.sh
 
-kubectl config use-context admin
+echo ""
 
-mkdir -p ~/.kube && cp admin.conf ~/.kube/config
+# Step 9: Start additional services
+echo "🌐 Step 9: Starting additional services..."
+./start-services.sh
 
-CERTS_OPTS="--client-cert-auth \
-           --cert-file=certs/admin.pem \
-           --key-file=certs/admin-key.pem \
-           --trusted-ca-file=certs/ca.pem"
+echo ""
+echo "✅ Kubernetes cluster setup complete!"
+echo ""
+echo "🔗 Available endpoints:"
+echo "  • Kubernetes API: https://127.0.0.1:4040"
+echo "  • HTTP Server: http://0.0.0.0:8080"
+echo ""
+echo "📋 To add worker nodes:"
+echo "  1. Check the generated setup-worker-node.sh script"
+echo "  2. Copy it to your external worker node"
+echo "  3. Edit NODE_NAME and NODE_IP in the script"
+echo "  4. Run it with sudo privileges"
+echo ""
+echo "🔍 Check cluster status:"
+echo "  bin/kubectl get nodes"
+echo "  bin/kubectl cluster-info"
 
-FORCE_HTTPS_OPTS="--advertise-client-urls https://127.0.0.1:2379 \
-                  --listen-client-urls https://127.0.0.1:2379"
-
-etcd --data-dir etcd-data $CERTS_OPTS $FORCE_HTTPS_OPTS &
-
-CERTS_OPTS="--client-ca-file=certs/ca.pem \
-            --tls-cert-file=certs/admin.pem \
-            --tls-private-key-file=certs/admin-key.pem \
-            --service-account-key-file=certs/admin.pem \
-            --service-account-signing-key-file=certs/admin-key.pem \
-            --service-account-issuer=https://kubernetes.default.svc.cluster.local"
-
-ETCD_OPTS="--etcd-cafile=certs/ca.pem \
-           --etcd-certfile=certs/admin.pem \
-           --etcd-keyfile=certs/admin-key.pem \
-           --etcd-servers=https://127.0.0.1:2379"
-
-bin/kube-apiserver ${CERTS_OPTS} ${ETCD_OPTS} \
-            --allow-privileged \
-	        --authorization-mode=Node,RBAC \
-            --secure-port 4040 &
-
-            #!/bin/bash
-CERTS_OPTS="--cluster-signing-cert-file=certs/ca.pem \
-            --cluster-signing-key-file=certs/ca-key.pem \
-            --service-account-private-key-file=certs/admin-key.pem \
-            --root-ca-file=certs/ca.pem"
-
-bin/kube-controller-manager ${CERTS_OPTS} \
---kubeconfig admin.conf \
---use-service-account-credentials \
---cluster-cidr=10.0.0.0/16 \
---allocate-node-cidrs=true &
-
-bin/kube-scheduler --kubeconfig admin.conf &
-
-# Start a basic HTTP server on port 8080
-echo "Starting basic HTTP server on port 8080..."
-python3 -m http.server 8080 --bind 0.0.0.0
+# Keep the script running
+wait
 

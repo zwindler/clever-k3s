@@ -12,7 +12,7 @@ if [[ ! -f "bin/kubectl" ]]; then
 fi
 
 # Generate a random token
-TOKEN_ID=$(head -c 6 /dev/urandom | xxd -p)
+TOKEN_ID=$(head -c 3 /dev/urandom | xxd -p)
 TOKEN_SECRET=$(head -c 16 /dev/urandom | xxd -p)
 TOKEN="${TOKEN_ID}.${TOKEN_SECRET}"
 

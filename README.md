@@ -181,7 +181,21 @@ K8S_VERSION="1.33.2"
 ...
 ```
 
-Just copy paste is to a linux VM capable of running kubelet and containerd and you should be good to go.
+Just copy paste is to a linux VM capable of running kubelet and containerd, edit the top variables (mostly NODE_NAME, NODE_IP and check BOOTSTRAP_TOKEN) and you should be good to go.
+
+```
+...
+✓ Worker node setup completed!
+
+Check status with:
+  sudo systemctl status kubelet
+  sudo systemctl status kube-proxy
+
+Check logs with:
+  sudo journalctl -u kubelet -f
+  sudo journalctl -u kube-proxy -f
+
+```
 
 ## Future work
 

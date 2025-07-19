@@ -15,6 +15,13 @@ if [[ ! -f "certs/ca.pem" ]]; then
     exit 1
 fi
 
+# Check if kube-proxy kubeconfig exists
+if [[ ! -f "kube-proxy.conf" ]]; then
+    echo "Error: kube-proxy.conf not found. Make sure kube-proxy certificates are generated first."
+    echo "Run: ./generate-kubeproxy-certs.sh"
+    exit 1
+fi
+
 echo "Creating worker node setup script..."
 
 cat > setup-worker-node.sh <<'EOF'
@@ -33,6 +40,70 @@ BOOTSTRAP_TOKEN="REPLACE_WITH_BOOTSTRAP_TOKEN"  # Replace with actual token
 K8S_VERSION="1.33.2"
 
 echo "=== Setting up Kubernetes worker node: $NODE_NAME ==="
+
+# Validate configuration
+if [[ "$NODE_IP" == "YOUR_NODE_IP" ]]; then
+    echo "ERROR: Please edit NODE_IP in this script before running!"
+    echo "Set NODE_IP to your worker node's actual IP address"
+    exit 1
+fi
+
+echo "Node configuration:"
+echo "  NODE_NAME: $NODE_NAME"
+echo "  NODE_IP: $NODE_IP"
+echo "  API_SERVER_ENDPOINT: $API_SERVER_ENDPOINT"
+echo ""
+
+# System prerequisites
+echo "Setting up system prerequisites..."
+
+# Install required packages
+echo "Installing required packages..."
+if command -v apt-get >/dev/null 2>&1; then
+    # Ubuntu/Debian
+    sudo apt-get update
+    sudo apt-get install -y curl wget socat conntrack ipset
+elif command -v yum >/dev/null 2>&1; then
+    # RHEL/CentOS
+    sudo yum install -y curl wget socat conntrack-tools ipset
+elif command -v dnf >/dev/null 2>&1; then
+    # Fedora
+    sudo dnf install -y curl wget socat conntrack-tools ipset
+else
+    echo "Warning: Unknown package manager. Please ensure curl, wget, socat, conntrack, and ipset are installed."
+fi
+
+# Load required kernel modules
+echo "Loading required kernel modules..."
+sudo modprobe br_netfilter
+sudo modprobe ip_vs
+sudo modprobe ip_vs_rr
+sudo modprobe ip_vs_wrr
+sudo modprobe ip_vs_sh
+sudo modprobe nf_conntrack
+
+# Make kernel modules persistent
+echo "Making kernel modules persistent..."
+sudo tee /etc/modules-load.d/k8s.conf <<MODULES_EOF
+br_netfilter
+ip_vs
+ip_vs_rr
+ip_vs_wrr
+ip_vs_sh
+nf_conntrack
+MODULES_EOF
+
+# Set sysctl parameters
+echo "Configuring sysctl parameters..."
+sudo tee /etc/sysctl.d/k8s.conf <<SYSCTL_EOF
+net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward = 1
+net.netfilter.nf_conntrack_max = 131072
+SYSCTL_EOF
+
+# Apply sysctl parameters
+sudo sysctl --system
 
 # Create directories
 echo "Creating directories..."
@@ -156,24 +227,8 @@ KUBELET_SERVICE_EOF
 
 # Create kube-proxy kubeconfig
 echo "Creating kube-proxy configuration..."
-sudo tee /etc/kubernetes/kube-proxy.conf <<PROXY_CONFIG_EOF
-apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    certificate-authority: /etc/kubernetes/pki/ca.crt
-    server: ${API_SERVER_ENDPOINT}
-  name: kubernetes
-contexts:
-- context:
-    cluster: kubernetes
-    user: kube-proxy
-  name: default
-current-context: default
-users:
-- name: kube-proxy
-  user:
-    token: ${BOOTSTRAP_TOKEN}
+sudo tee /etc/kubernetes/kube-proxy.conf <<'PROXY_CONFIG_EOF'
+KUBE_PROXY_KUBECONFIG_PLACEHOLDER
 PROXY_CONFIG_EOF
 
 # Create kube-proxy configuration
@@ -185,6 +240,9 @@ clientConnection:
   kubeconfig: "/etc/kubernetes/kube-proxy.conf"
 mode: "iptables"
 clusterCIDR: "10.0.0.0/16"
+bindAddress: "${NODE_IP}"
+healthzBindAddress: "${NODE_IP}:10256"
+metricsBindAddress: "${NODE_IP}:10249"
 PROXY_YAML_EOF
 
 # Create kube-proxy systemd service
@@ -245,10 +303,35 @@ if [[ -f "certs/ca.pem" ]]; then
     mv "$temp_script" setup-worker-node.sh
 fi
 
+# Replace kube-proxy kubeconfig placeholder
+if [[ -f "kube-proxy.conf" ]]; then
+    echo "Embedding kube-proxy kubeconfig in worker script..."
+    # Use a temporary file to handle multiline replacement safely
+    temp_script=$(mktemp)
+    while IFS= read -r line; do
+        if [[ "$line" == "KUBE_PROXY_KUBECONFIG_PLACEHOLDER" ]]; then
+            cat kube-proxy.conf
+        else
+            echo "$line"
+        fi
+    done < setup-worker-node.sh > "$temp_script"
+    mv "$temp_script" setup-worker-node.sh
+else
+    echo "Warning: kube-proxy.conf not found. Worker script will need manual kube-proxy configuration."
+fi
+
 echo "✓ Worker setup script generated: setup-worker-node.sh"
 echo ""
 echo "📋 Next steps:"
 echo "1. Copy setup-worker-node.sh to your external worker node"
 echo "2. Edit NODE_NAME and NODE_IP variables in the script"
-echo "3. Run the script on your worker node with sudo privileges"
-echo "4. Check the node joined with: kubectl get nodes"
+echo "3. Ensure your worker node has sudo privileges and internet access"
+echo "4. Run the script on your worker node with sudo privileges"
+echo "5. Check the node joined with: kubectl get nodes"
+echo ""
+echo "ℹ️  The script will automatically:"
+echo "   - Install required packages (curl, wget, socat, conntrack, ipset)"
+echo "   - Load necessary kernel modules"
+echo "   - Configure sysctl parameters"
+echo "   - Install container runtime (containerd)"
+echo "   - Set up kubelet and kube-proxy with proper certificates"

@@ -3,13 +3,12 @@
 # Main script to setup and run Kubernetes cluster
 set -e
 
-# Export environment variables
-export K8S_VERSION=1.33.2
-export ETCD_VERSION=3.5.18
-export ARCH=amd64
+# Source environment variables
+source .env
 
 echo "🚀 Starting Kubernetes cluster setup..."
 echo "Kubernetes version: $K8S_VERSION"
+echo "Run './versions.sh' to see all configured versions"
 echo ""
 
 # Step 1: Setup binaries and tools
@@ -86,6 +85,15 @@ echo ""
 echo "🔍 Check cluster status:"
 echo "  bin/kubectl get nodes"
 echo "  bin/kubectl cluster-info"
+echo ""
+echo "📄 Check component logs:"
+echo "  ./logs.sh                    # Show log status"
+echo "  ./logs.sh tail <component>   # Follow logs"
+echo "  ./logs.sh errors             # Show recent errors"
+echo ""
+echo "⚙️  Configuration:"
+echo "  ./versions.sh                # Show current versions"
+echo "  Edit .env file to update versions"
 
 # Keep the script running
 wait

@@ -3,9 +3,8 @@
 # Setup Kubernetes binaries and tools
 set -e
 
-K8S_VERSION=${K8S_VERSION:-1.33.2}
-ETCD_VERSION=${ETCD_VERSION:-3.5.18}
-ARCH=${ARCH:-amd64}
+# Source environment variables
+source .env
 
 echo "=== Setting up Kubernetes binaries (v${K8S_VERSION}) ==="
 

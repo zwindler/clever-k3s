@@ -3,6 +3,9 @@
 # Generate kube-proxy certificate and kubeconfig
 set -e
 
+# Source environment variables
+source .env
+
 echo "=== Generating kube-proxy certificates and kubeconfig ==="
 
 # Check if we're in the right directory
@@ -53,7 +56,7 @@ export KUBECONFIG=kube-proxy.conf
 bin/kubectl config set-cluster dumberk8s \
   --certificate-authority=certs/ca.pem \
   --embed-certs=true \
-  --server=https://dumberk8s.zwindler.fr:5332
+  --server=${API_SERVER_ENDPOINT}
 
 bin/kubectl config set-credentials system:kube-proxy \
   --embed-certs=true \

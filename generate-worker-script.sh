@@ -3,10 +3,18 @@
 # Generate setup script for external worker nodes
 set -e
 
+# Source environment variables
+source .env
+
 echo "=== Generating worker node setup script ==="
+echo "Versions:"
+echo "  Kubernetes: ${K8S_VERSION}"
+echo "  Containerd: ${CONTAINERD_VERSION}"
+echo "  Runc: ${RUNC_VERSION}"
+echo "  CNI: ${CNI_VERSION}"
+echo ""
 
 # Configuration
-API_SERVER_ENDPOINT="https://dumberk8s.zwindler.fr:5332"
 BOOTSTRAP_TOKEN=$(cat bootstrap-token.txt 2>/dev/null || echo "REPLACE_WITH_BOOTSTRAP_TOKEN")
 
 # Check if CA certificate exists
@@ -24,7 +32,7 @@ fi
 
 echo "Creating worker node setup script..."
 
-cat > setup-worker-node.sh <<'EOF'
+cat > setup-worker-node.sh <<EOF
 #!/bin/bash
 
 # External Worker Node Setup Script for Kubernetes
@@ -35,9 +43,14 @@ set -e
 # Configuration - EDIT THESE VALUES
 NODE_NAME="worker-1"  # Change this to your node name
 NODE_IP="YOUR_NODE_IP"  # Change this to your external node IP
-API_SERVER_ENDPOINT="https://dumberk8s.zwindler.fr:5332"
+API_SERVER_ENDPOINT="${API_SERVER_ENDPOINT}"
 BOOTSTRAP_TOKEN="REPLACE_WITH_BOOTSTRAP_TOKEN"  # Replace with actual token
-K8S_VERSION="1.33.2"
+
+# Version configuration
+K8S_VERSION="${K8S_VERSION}"
+CONTAINERD_VERSION="${CONTAINERD_VERSION}"
+RUNC_VERSION="${RUNC_VERSION}"
+CNI_VERSION="${CNI_VERSION}"
 
 echo "=== Setting up Kubernetes worker node: $NODE_NAME ==="
 
@@ -120,8 +133,7 @@ sudo chmod 700 /var/lib/kubelet/pki
 
 # Install container runtime (containerd)
 echo "Installing containerd..."
-CONTAINERD_VERSION="1.7.22"
-curl -L https://github.com/containerd/containerd/releases/download/v${CONTAINERD_VERSION}/containerd-${CONTAINERD_VERSION}-linux-amd64.tar.gz -o containerd.tar.gz
+curl -L https://github.com/containerd/containerd/releases/download/v\${CONTAINERD_VERSION}/containerd-\${CONTAINERD_VERSION}-linux-amd64.tar.gz -o containerd.tar.gz
 sudo tar -C /usr/local -xzf containerd.tar.gz
 sudo mkdir -p /usr/local/lib/systemd/system
 curl -L https://raw.githubusercontent.com/containerd/containerd/main/containerd.service -o containerd.service
@@ -138,19 +150,17 @@ sudo systemctl restart containerd
 
 # Install runc
 echo "Installing runc..."
-RUNC_VERSION="1.1.14"
-curl -L https://github.com/opencontainers/runc/releases/download/v${RUNC_VERSION}/runc.amd64 -o runc
+curl -L https://github.com/opencontainers/runc/releases/download/v\${RUNC_VERSION}/runc.amd64 -o runc
 sudo install -m 755 runc /usr/local/sbin/runc
 
 # Install CNI plugins
 echo "Installing CNI plugins..."
-CNI_VERSION="1.5.1"
-curl -L https://github.com/containernetworking/plugins/releases/download/v${CNI_VERSION}/cni-plugins-linux-amd64-v${CNI_VERSION}.tgz -o cni-plugins.tgz
+curl -L https://github.com/containernetworking/plugins/releases/download/v\${CNI_VERSION}/cni-plugins-linux-amd64-v\${CNI_VERSION}.tgz -o cni-plugins.tgz
 sudo tar -C /opt/cni/bin -xzf cni-plugins.tgz
 
 # Download Kubernetes binaries
 echo "Downloading Kubernetes binaries..."
-curl -L https://dl.k8s.io/v${K8S_VERSION}/kubernetes-node-linux-amd64.tar.gz -o kubernetes-node.tar.gz
+curl -L https://dl.k8s.io/v\${K8S_VERSION}/kubernetes-node-linux-amd64.tar.gz -o kubernetes-node.tar.gz
 tar -xzf kubernetes-node.tar.gz
 sudo cp kubernetes/node/bin/{kubelet,kube-proxy} /usr/local/bin/
 sudo chmod +x /usr/local/bin/{kubelet,kube-proxy}
@@ -169,7 +179,7 @@ kind: Config
 clusters:
 - cluster:
     certificate-authority: /etc/kubernetes/pki/ca.crt
-    server: ${API_SERVER_ENDPOINT}
+    server: \${API_SERVER_ENDPOINT}
   name: kubernetes
 contexts:
 - context:
@@ -180,7 +190,7 @@ current-context: default
 users:
 - name: kubelet-bootstrap
   user:
-    token: ${BOOTSTRAP_TOKEN}
+    token: \${BOOTSTRAP_TOKEN}
 BOOTSTRAP_EOF
 
 # Create kubelet configuration
@@ -224,8 +234,8 @@ ExecStart=/usr/local/bin/kubelet \\
   --kubeconfig=/etc/kubernetes/kubelet.conf \\
   --config=/var/lib/kubelet/config.yaml \\
   --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock \\
-  --node-ip=${NODE_IP} \\
-  --hostname-override=${NODE_NAME} \\
+  --node-ip=\${NODE_IP} \\
+  --hostname-override=\${NODE_NAME} \\
   --v=2
 Restart=on-failure
 RestartSec=5
@@ -249,9 +259,9 @@ clientConnection:
   kubeconfig: "/etc/kubernetes/kube-proxy.conf"
 mode: "iptables"
 clusterCIDR: "10.0.0.0/16"
-bindAddress: "${NODE_IP}"
-healthzBindAddress: "${NODE_IP}:10256"
-metricsBindAddress: "${NODE_IP}:10249"
+bindAddress: "\${NODE_IP}"
+healthzBindAddress: "\${NODE_IP}:10256"
+metricsBindAddress: "\${NODE_IP}:10249"
 PROXY_YAML_EOF
 
 # Create kube-proxy systemd service

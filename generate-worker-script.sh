@@ -109,8 +109,14 @@ sudo sysctl --system
 echo "Creating directories..."
 sudo mkdir -p /etc/kubernetes/{manifests,pki}
 sudo mkdir -p /var/lib/{kubelet,kube-proxy}
+sudo mkdir -p /var/lib/kubelet/pki
 sudo mkdir -p /opt/cni/bin
 sudo mkdir -p /etc/cni/net.d
+
+# Set proper permissions for kubelet directories
+sudo chown -R root:root /var/lib/kubelet
+sudo chmod 755 /var/lib/kubelet
+sudo chmod 700 /var/lib/kubelet/pki
 
 # Install container runtime (containerd)
 echo "Installing containerd..."
@@ -195,9 +201,12 @@ clusterDomain: "cluster.local"
 clusterDNS:
   - "10.32.0.10"
 runtimeRequestTimeout: "15m"
-tlsCertFile: "/var/lib/kubelet/pki/kubelet.crt"
-tlsPrivateKeyFile: "/var/lib/kubelet/pki/kubelet.key"
+# Don't specify TLS cert files - let kubelet create them during bootstrap
+# tlsCertFile: "/var/lib/kubelet/pki/kubelet.crt"
+# tlsPrivateKeyFile: "/var/lib/kubelet/pki/kubelet.key"
 containerRuntimeEndpoint: "unix:///var/run/containerd/containerd.sock"
+serverTLSBootstrap: true
+rotateCertificates: true
 KUBELET_CONFIG_EOF
 
 # Create kubelet systemd service

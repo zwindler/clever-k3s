@@ -55,6 +55,20 @@ roleRef:
   kind: ClusterRole
   name: system:certificates.k8s.io:certificatesigningrequests:selfnodeclient
   apiGroup: rbac.authorization.k8s.io
+---
+# Auto-approve server certificate CSRs for nodes
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: auto-approve-csrs-for-group-server
+subjects:
+- kind: Group
+  name: system:bootstrappers:worker
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: system:certificates.k8s.io:certificatesigningrequests:selfnodeserver
+  apiGroup: rbac.authorization.k8s.io
 EOF
 
 # Wait for API server to be ready

@@ -40,11 +40,42 @@ cat > setup-worker-node.sh <<EOF
 
 set -e
 
-# Configuration - EDIT THESE VALUES
-NODE_NAME="worker-1"  # Change this to your node name
-NODE_IP="YOUR_NODE_IP"  # Change this to your external node IP
+# Configuration - Auto-detected with override options
+# Override these variables before running if the auto-detection is incorrect
+NODE_NAME_OVERRIDE=""  # Leave empty to use hostname, or set to override
+NODE_IP_OVERRIDE=""    # Leave empty to auto-detect, or set to override (e.g., "192.168.1.100")
 API_SERVER_ENDPOINT="${API_SERVER_ENDPOINT}"
 BOOTSTRAP_TOKEN="REPLACE_WITH_BOOTSTRAP_TOKEN"  # Replace with actual token
+
+# Auto-detect node name and IP
+if [[ -n "\$NODE_NAME_OVERRIDE" ]]; then
+    NODE_NAME="\$NODE_NAME_OVERRIDE"
+    echo "Using override NODE_NAME: \$NODE_NAME"
+else
+    NODE_NAME="\$(hostname)"
+    echo "Auto-detected NODE_NAME: \$NODE_NAME"
+fi
+
+if [[ -n "\$NODE_IP_OVERRIDE" ]]; then
+    NODE_IP="\$NODE_IP_OVERRIDE"
+    echo "Using override NODE_IP: \$NODE_IP"
+else
+    # Try to detect the main IP address (excluding loopback and docker interfaces)
+    NODE_IP=\$(ip route get 8.8.8.8 2>/dev/null | awk '{for(i=1;i<=NF;i++) if(\$i=="src") print \$(i+1); exit}')
+    
+    # Fallback to first non-loopback IP if route detection fails
+    if [[ -z "\$NODE_IP" ]]; then
+        NODE_IP=\$(ip addr show | grep -E 'inet [0-9]+\.' | grep -v '127.0.0.1' | grep -v 'docker' | head -1 | awk '{print \$2}' | cut -d/ -f1)
+    fi
+    
+    if [[ -n "\$NODE_IP" ]]; then
+        echo "Auto-detected NODE_IP: \$NODE_IP"
+    else
+        echo "ERROR: Could not auto-detect NODE_IP. Please set NODE_IP_OVERRIDE at the top of this script."
+        echo "Example: NODE_IP_OVERRIDE=\"192.168.1.100\""
+        exit 1
+    fi
+fi
 
 # Version configuration
 K8S_VERSION="${K8S_VERSION}"
@@ -52,19 +83,12 @@ CONTAINERD_VERSION="${CONTAINERD_VERSION}"
 RUNC_VERSION="${RUNC_VERSION}"
 CNI_VERSION="${CNI_VERSION}"
 
-echo "=== Setting up Kubernetes worker node: $NODE_NAME ==="
-
-# Validate configuration
-if [[ "$NODE_IP" == "YOUR_NODE_IP" ]]; then
-    echo "ERROR: Please edit NODE_IP in this script before running!"
-    echo "Set NODE_IP to your worker node's actual IP address"
-    exit 1
-fi
+echo "=== Setting up Kubernetes worker node: \$NODE_NAME ==="
 
 echo "Node configuration:"
-echo "  NODE_NAME: $NODE_NAME"
-echo "  NODE_IP: $NODE_IP"
-echo "  API_SERVER_ENDPOINT: $API_SERVER_ENDPOINT"
+echo "  NODE_NAME: \$NODE_NAME"
+echo "  NODE_IP: \$NODE_IP"
+echo "  API_SERVER_ENDPOINT: \$API_SERVER_ENDPOINT"
 echo ""
 
 # System prerequisites
@@ -343,12 +367,13 @@ echo "✓ Worker setup script generated: setup-worker-node.sh"
 echo ""
 echo "📋 Next steps:"
 echo "1. Copy setup-worker-node.sh to your external worker node"
-echo "2. Edit NODE_NAME and NODE_IP variables in the script"
+echo "2. (Optional) Edit NODE_NAME_OVERRIDE and NODE_IP_OVERRIDE if auto-detection is incorrect"
 echo "3. Ensure your worker node has sudo privileges and internet access"
-echo "4. Run the script on your worker node with sudo privileges"
+echo "4. Run the script on your worker node: sudo ./setup-worker-node.sh"
 echo "5. Check the node joined with: kubectl get nodes"
 echo ""
 echo "ℹ️  The script will automatically:"
+echo "   - Auto-detect hostname and IP address (with override options)"
 echo "   - Install required packages (curl, wget, socat, conntrack, ipset)"
 echo "   - Load necessary kernel modules"
 echo "   - Configure sysctl parameters"
